@@ -1,0 +1,90 @@
+rules_version = '2';
+
+// Security model
+// --------------
+// * Every user must be signed in (Google or anonymous Firebase Auth).
+// * A session is only readable/writable by its MEMBERS (sessions/{id}/members/{uid}).
+// * A user can only add themselves as a member, and only by presenting the
+//   session's secret accessKey (a ~140-bit random value that lives in the share link).
+//   Guessing a session ID is therefore useless.
+// * Candidates are created once (by the session owner) and afterwards only the
+//   attendance / updatedAt / updatedBy fields can change.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function sessionDoc(id) {
+      return /databases/$(database)/documents/sessions/$(id);
+    }
+
+    function memberDoc(id) {
+      return /databases/$(database)/documents/sessions/$(id)/members/$(request.auth.uid);
+    }
+
+    function isMember(id) {
+      return signedIn() && exists(memberDoc(id));
+    }
+
+    function isOwner(id) {
+      return signedIn() && get(sessionDoc(id)).data.createdBy == request.auth.uid;
+    }
+
+    match /sessions/{sessionId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(
+             ['name', 'date', 'createdAt', 'createdBy', 'createdByName', 'accessKey', 'groups', 'counts'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.accessKey is string
+        && request.resource.data.accessKey.size() >= 20
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 120;
+
+      allow read: if isMember(sessionId);
+
+      // Only the owner may rename the session.
+      allow update: if isOwner(sessionId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 120;
+
+      match /members/{uid} {
+        // A user may only see their own membership record.
+        allow read: if signedIn() && request.auth.uid == uid;
+
+        // A user may only add themselves, and only with the session's secret key.
+        // getAfter() lets the owner create the session and their membership in one batch.
+        allow create: if signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['key', 'name', 'joinedAt'])
+          && request.resource.data.key == getAfter(sessionDoc(sessionId)).data.accessKey;
+      }
+
+      match /candidates/{candidateId} {
+        allow read: if isMember(sessionId);
+
+        // Only the session owner seeds the candidate list.
+        allow create: if isOwner(sessionId)
+          && request.resource.data.keys().hasOnly(
+               ['name', 'group', 'serial', 'seq', 'attendance', 'updatedAt', 'updatedBy'])
+          && request.resource.data.attendance == 'unmarked';
+
+        // Members can only change attendance (+ audit fields).
+        allow update: if isMember(sessionId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['attendance', 'updatedAt', 'updatedBy'])
+          && request.resource.data.attendance in ['present', 'absent', 'unmarked']
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedAt == request.time;
+
+        allow delete: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
