@@ -30,18 +30,35 @@ export default function FilePreview({ parsed, creating, error, onStart, onStartL
         <p className="muted">{formatDate(date)}</p>
       </div>
 
-      {error && <p className="alert alert--error" role="alert">{error}</p>}
+      {error && (
+        <div className="alert alert--error" role="alert">
+          <p>{error}</p>
+          <p className="muted" style={{ marginTop: '0.4rem', color: 'inherit' }}>
+            Tip: You can use <strong>Start on This Device</strong> to proceed offline without cloud sharing.
+          </p>
+        </div>
+      )}
 
       <div className="stack">
-        <button type="button" className="btn btn--primary btn--xl" disabled={creating || !date} onClick={() => onStart({ name: name.trim() || 'Attendance Session', date })}>
-          {creating ? 'Creating session…' : 'Start Attendance'}
+        <button
+          type="button"
+          className="btn btn--primary btn--xl"
+          disabled={creating || !date}
+          onClick={() => onStart({ name: name.trim() || 'Attendance Session', date })}
+        >
+          {creating ? 'Creating shared session…' : 'Start Shared Session (Cloud)'}
         </button>
-        {error && (
-          <button type="button" className="btn" disabled={creating} onClick={() => onStartLocal({ name: name.trim() || 'Attendance Session', date })}>
-            Use this device only (no sharing)
-          </button>
-        )}
-        <button type="button" className="btn" disabled={creating} onClick={onCancel}>Choose a different file</button>
+        <button
+          type="button"
+          className="btn btn--xl"
+          disabled={creating || !date}
+          onClick={() => onStartLocal({ name: name.trim() || 'Attendance Session', date })}
+        >
+          Start on This Device (Offline / Fast)
+        </button>
+        <button type="button" className="btn" disabled={creating} onClick={onCancel}>
+          Choose a different file
+        </button>
       </div>
     </main>
   );
