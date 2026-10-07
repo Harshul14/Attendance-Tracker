@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLiveSession } from '../hooks/useLiveSession';
 import { NEXT_STATUS, computeStats, filterCandidates } from '../utils/attendance';
 import { exportAttendance } from '../utils/export';
-import { buildShareUrl, setAttendance, setAttendanceBulk } from '../utils/sessions';
+import { sessionLink } from '../utils/sessions';
 import CandidateList from './CandidateList';
 import ConfirmDialog from './ConfirmDialog';
 import Header from './Header';
@@ -10,8 +10,8 @@ import ShareDialog from './ShareDialog';
 import SummaryCards from './SummaryCards';
 import Toolbar from './Toolbar';
 
-export default function AttendanceDashboard({ user, sessionId, accessKey, onExit, onNewUpload, onSignOut }) {
-  const { phase, error, session, candidates, connection } = useLiveSession(user, sessionId, accessKey);
+export default function AttendanceDashboard({ sessionId, accessKey, operator, onExit, onNewUpload }) {
+  const { phase, error, session, candidates, connection, apply } = useLiveSession(sessionId, accessKey, operator);
   const [tab, setTab] = useState('all');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
@@ -20,11 +20,6 @@ export default function AttendanceDashboard({ user, sessionId, accessKey, onExit
   const undoStack = useRef([]);
   const [canUndo, setCanUndo] = useState(false);
 
-  const showError = useCallback((e) => {
-    setNotice(e?.code === 'permission-denied' ? 'That change was rejected: you no longer have access.' : 'Could not save that change.');
-    setTimeout(() => setNotice(''), 4000);
-  }, []);
-
   const pushUndo = useCallback((entry) => {
     undoStack.current = [...undoStack.current.slice(-49), entry];
     setCanUndo(true);
@@ -32,18 +27,16 @@ export default function AttendanceDashboard({ user, sessionId, accessKey, onExit
 
   const cycle = useCallback(
     (candidate) => {
-      const next = NEXT_STATUS[candidate.attendance] || 'present';
-      pushUndo([{ id: candidate.id, previous: candidate.attendance }]);
-      setAttendance(sessionId, candidate.id, next, user.uid).catch(showError);
+      pushUndo([{ id: candidate.id, status: candidate.attendance }]);
+      apply([{ id: candidate.id, status: NEXT_STATUS[candidate.attendance] || 'present' }]);
     },
-    [sessionId, user.uid, pushUndo, showError],
+    [apply, pushUndo],
   );
 
   const undo = () => {
     const entry = undoStack.current.pop();
     setCanUndo(undoStack.current.length > 0);
-    if (!entry) return;
-    entry.forEach(({ id, previous }) => setAttendance(sessionId, id, previous, user.uid).catch(showError));
+    if (entry) apply(entry);
   };
 
   const groups = session?.groups ?? [];
@@ -58,16 +51,15 @@ export default function AttendanceDashboard({ user, sessionId, accessKey, onExit
 
   const bulkMark = (status) => {
     const targets = shownGroups.flatMap((g) => visibleByGroup[g]).filter((c) => c.attendance !== status);
-    pushUndo(targets.map((c) => ({ id: c.id, previous: c.attendance })));
-    setAttendanceBulk(sessionId, targets.map((c) => c.id), status, user.uid).catch(showError);
+    pushUndo(targets.map((c) => ({ id: c.id, status: c.attendance })));
+    apply(targets.map((c) => ({ id: c.id, status })));
     setDialog(null);
   };
 
   const resetAll = () => {
-    const targets = candidates.filter((c) => c.attendance !== 'unmarked');
     undoStack.current = [];
     setCanUndo(false);
-    setAttendanceBulk(sessionId, targets.map((c) => c.id), 'unmarked', user.uid).catch(showError);
+    apply(candidates.filter((c) => c.attendance !== 'unmarked').map((c) => ({ id: c.id, status: 'unmarked' })));
     setDialog(null);
   };
 
@@ -83,7 +75,7 @@ export default function AttendanceDashboard({ user, sessionId, accessKey, onExit
   if (phase === 'error') {
     return (
       <>
-        <Header user={user} onSignOut={onSignOut} />
+        <Header />
         <main className="panel panel--narrow">
           <h2>Cannot open session</h2>
           <p className="alert alert--error" role="alert">{error}</p>
@@ -96,7 +88,7 @@ export default function AttendanceDashboard({ user, sessionId, accessKey, onExit
   if (!session) {
     return (
       <>
-        <Header user={user} onSignOut={onSignOut} />
+        <Header />
         <main className="panel panel--narrow"><p role="status">Opening session…</p></main>
       </>
     );
@@ -106,7 +98,7 @@ export default function AttendanceDashboard({ user, sessionId, accessKey, onExit
 
   return (
     <>
-      <Header session={session} total={stats.total} connection={connection} user={user} onShare={() => setDialog('share')} onSignOut={onSignOut} />
+      <Header session={session} total={stats.total} connection={connection} onShare={() => setDialog('share')} />
       <div className="sticky">
         <SummaryCards stats={stats} />
       </div>
@@ -129,7 +121,7 @@ export default function AttendanceDashboard({ user, sessionId, accessKey, onExit
       {(dialog === 'present' || dialog === 'absent') && (
         <ConfirmDialog title={`Mark ${shownCount} visible as ${bulkLabel}?`} message="Only the candidates currently shown (after search, filter and tab) will change." confirmLabel={`Mark ${bulkLabel}`} onConfirm={() => bulkMark(dialog)} onCancel={() => setDialog(null)} />
       )}
-      {dialog === 'share' && <ShareDialog url={buildShareUrl(session, sessionId)} onClose={() => setDialog(null)} />}
+      {dialog === 'share' && <ShareDialog url={sessionLink(sessionId, accessKey)} onClose={() => setDialog(null)} />}
     </>
   );
 }

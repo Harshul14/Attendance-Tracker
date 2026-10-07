@@ -1,7 +1,7 @@
 import { formatDate } from '../utils/attendance';
 import StatusIndicator from './StatusIndicator';
 
-export default function Header({ session, total, connection, user, onShare, onSignOut }) {
+export default function Header({ session, total, connection, onShare }) {
   return (
     <header className="header">
       <div className="header__main">
@@ -23,11 +23,6 @@ export default function Header({ session, total, connection, user, onShare, onSi
           {onShare && (
             <button type="button" className="btn btn--primary" onClick={onShare}>
               Share Session
-            </button>
-          )}
-          {user && (
-            <button type="button" className="btn btn--ghost" onClick={onSignOut} title={user.displayName || 'Guest'}>
-              Sign out
             </button>
           )}
         </div>

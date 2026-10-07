@@ -1,108 +1,41 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ensureMembership, subscribeCandidates, subscribeSession } from '../utils/sessions';
-import { rememberSession } from '../utils/storage';
-import { useOnline } from './useOnline';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { remote } from '../utils/remote';
+import { rememberSession, sessionCache } from '../utils/storage';
+import { SyncEngine } from '../utils/sync';
 
-const toCandidate = (docSnap) => ({
-  id: docSnap.id,
-  ...docSnap.data(),
-  pending: docSnap.metadata.hasPendingWrites,
-});
-
-const describeError = (error) =>
-  error?.code === 'permission-denied'
-    ? 'You do not have access to this session. Open the full share link you were given.'
-    : 'The session could not be loaded. Check your connection and try again.';
-
-/**
- * Subscribes to a session and its candidates in real time.
- * Candidate objects keep their identity unless their own document changed,
- * so memoised cards only re-render when needed.
- */
-export function useLiveSession(user, sessionId, accessKey) {
-  const online = useOnline();
-  const [phase, setPhase] = useState('joining'); // joining | ready | error
-  const [error, setError] = useState('');
-  const [session, setSession] = useState(null);
-  const [candidates, setCandidates] = useState([]);
-  const [cache, setCache] = useState({ fromCache: true, pending: 0 });
-  const map = useRef(new Map());
+/** Connects to a session and keeps it live. Returns the data plus `apply` to change attendance. */
+export function useLiveSession(sessionId, key, operator) {
+  const engineRef = useRef(null);
+  const [state, setState] = useState({
+    phase: 'joining',
+    error: '',
+    session: null,
+    candidates: [],
+    connection: { state: 'syncing', pending: 0 },
+  });
 
   useEffect(() => {
-    let cancelled = false;
-    let stops = [];
-    map.current = new Map();
-    setPhase('joining');
-    setError('');
-    setSession(null);
-    setCandidates([]);
-
-    const fail = (e) => {
-      if (cancelled) return;
-      setError(e?.message && !e.code ? e.message : describeError(e));
-      setPhase('error');
-    };
-
-    (async () => {
-      try {
-        await ensureMembership(user, sessionId, accessKey);
-      } catch (e) {
-        fail(e);
-        return;
-      }
-      if (cancelled) return;
-
-      stops.push(
-        subscribeSession(
-          sessionId,
-          (snap) => {
-            if (cancelled) return;
-            if (!snap.exists()) {
-              if (!snap.metadata.fromCache) fail({ message: 'This session no longer exists.' });
-              return;
-            }
-            const data = snap.data();
-            setSession(data);
-            setPhase('ready');
-            rememberSession({ id: sessionId, key: data.accessKey, name: data.name, date: data.date, uid: user.uid });
-          },
-          fail,
-        ),
-      );
-
-      stops.push(
-        subscribeCandidates(
-          sessionId,
-          (snap) => {
-            if (cancelled) return;
-            snap.docChanges({ includeMetadataChanges: true }).forEach((change) => {
-              if (change.type === 'removed') map.current.delete(change.doc.id);
-              else map.current.set(change.doc.id, toCandidate(change.doc));
-            });
-            setCandidates(Array.from(map.current.values()).sort((a, b) => a.seq - b.seq));
-            setCache({
-              fromCache: snap.metadata.fromCache,
-              pending: snap.docs.filter((d) => d.metadata.hasPendingWrites).length,
-            });
-          },
-          fail,
-        ),
-      );
-    })();
-
+    setState((s) => ({ ...s, phase: 'joining', error: '', session: null, candidates: [] }));
+    const engine = new SyncEngine({
+      id: sessionId,
+      key,
+      operator,
+      remote,
+      cache: sessionCache,
+      onUpdate: ({ session, candidates, connection }) => {
+        setState((s) => ({ ...s, phase: session ? 'ready' : s.phase, session, candidates, connection }));
+        if (session) rememberSession({ id: sessionId, key, name: session.name, date: session.date });
+      },
+      onFatal: (error) => setState((s) => ({ ...s, phase: 'error', error })),
+    });
+    engineRef.current = engine;
+    engine.start();
     return () => {
-      cancelled = true;
-      stops.forEach((stop) => stop());
-      stops = [];
+      engine.stop();
+      engineRef.current = null;
     };
-  }, [user, sessionId, accessKey]);
+  }, [sessionId, key, operator]);
 
-  // live = in sync with the server, syncing = changes waiting / catching up, offline = no connection
-  const connection = useMemo(() => {
-    if (!online) return { state: 'offline', pending: cache.pending };
-    if (cache.pending > 0 || cache.fromCache) return { state: 'syncing', pending: cache.pending };
-    return { state: 'live', pending: 0 };
-  }, [online, cache]);
-
-  return { phase, error, session, candidates, connection };
+  const apply = useCallback((changes) => engineRef.current?.apply(changes), []);
+  return { ...state, apply };
 }

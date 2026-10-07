@@ -3,7 +3,7 @@ import { parseExcelFile } from '../utils/excel';
 import { parseSessionInput } from '../utils/sessions';
 import { formatDate } from '../utils/attendance';
 
-export default function UploadScreen({ recent, onParsed, onJoin, onForget }) {
+export default function UploadScreen({ recent, operator, onOperator, onParsed, onJoin, onForget }) {
   const inputRef = useRef(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -28,7 +28,7 @@ export default function UploadScreen({ recent, onParsed, onJoin, onForget }) {
     event.preventDefault();
     const target = parseSessionInput(joinText);
     if (!target) {
-      setError('Please paste a valid session link or session ID.');
+      setError('Please paste the full session link (it must include the part after #).');
       return;
     }
     setError('');
@@ -39,6 +39,11 @@ export default function UploadScreen({ recent, onParsed, onJoin, onForget }) {
     <main className="panel panel--narrow">
       <h2>Start an attendance session</h2>
       <p className="muted">Your Excel file is read in your browser. Only candidate names are saved to your session.</p>
+
+      <div className="fields">
+        <label htmlFor="operator">Your name (shown as who marked attendance)</label>
+        <input id="operator" className="input" value={operator} maxLength={40} onChange={(e) => onOperator(e.target.value)} />
+      </div>
 
       <input ref={inputRef} type="file" accept=".xlsx,.xls" className="visually-hidden" onChange={handleFile} aria-label="Upload Excel file" />
       <div className="stack">
@@ -52,7 +57,7 @@ export default function UploadScreen({ recent, onParsed, onJoin, onForget }) {
 
       {joining && (
         <form className="join" onSubmit={handleJoin}>
-          <label htmlFor="join-input">Session link / Session ID</label>
+          <label htmlFor="join-input">Session link</label>
           <input id="join-input" className="input" value={joinText} onChange={(e) => setJoinText(e.target.value)} placeholder="Paste the share link" autoFocus />
           <button type="submit" className="btn btn--primary">Open session</button>
         </form>
