@@ -22,7 +22,7 @@ export function sessionLink(id, key) {
 }
 
 /** Builds the shared document (candidates are fixed; attendance starts empty) and stores it encrypted. */
-export async function createSession({ operator, name, date, parsed }) {
+export async function createSession({ operator, name, date, parsed, local = false }) {
   const groups = GROUPS.filter((g) => parsed.groups[g]?.length);
   const candidates = [];
   groups.forEach((group) => {
@@ -50,6 +50,6 @@ export async function createSession({ operator, name, date, parsed }) {
     att: {},
   };
   const key = generateKey();
-  const id = await remote.create(await encrypt(doc, key));
+  const id = await remote.create(await encrypt(doc, key), local);
   return { id, key };
 }

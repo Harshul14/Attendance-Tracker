@@ -21,7 +21,7 @@ Blank cells are ignored; repeated names are kept as separate candidates (a warni
 ## How sharing and storage work
 
 - Creating a session stores the candidate list (and later the attendance) as **one encrypted blob** on the free
-  [jsonblob.com](https://jsonblob.com) service. Nothing else is stored anywhere else.
+  [restful-api.dev](https://restful-api.dev) service (no account needed). Nothing else is stored anywhere else.
 - Data is encrypted in your browser (AES-256-GCM). The key is in the share link after the `#`
   (`…/?session=ID#k=KEY`). Browsers never send the `#` part to any server, so the storage service only ever sees
   unreadable ciphertext.
@@ -35,10 +35,11 @@ Blank cells are ignored; repeated names are kept as separate candidates (a warni
 
 - Updates appear within a few seconds (polling), not instantly.
 - Timestamps come from device clocks; keep device clocks roughly correct (the default on phones/laptops).
-- jsonblob.com is a free third-party service with no uptime guarantee and removes blobs after long inactivity.
+- restful-api.dev is a free third-party service with no uptime guarantee and may delete old data (assume about 3 days).
   **Export to Excel at the end of each session** as your permanent record. Anyone who learns the blob ID (not the key) could
   delete or overwrite it, but cannot read it.
 - The first join from a new device needs internet.
+- If the sharing service is unreachable, the app offers **"Use this device only"** so attendance can still be taken (no sharing, still exportable).
 
 ## Run locally
 
@@ -62,4 +63,4 @@ npm run build      # output in dist/
 
 ## Privacy
 
-Excel files never leave your browser. Only the encrypted session blob is sent to jsonblob.com. No analytics, no tracking.
+Excel files never leave your browser. Only the encrypted session blob is sent to restful-api.dev. No analytics, no tracking.

@@ -1,7 +1,7 @@
 import { formatDate } from '../utils/attendance';
 import StatusIndicator from './StatusIndicator';
 
-export default function Header({ session, total, connection, onShare }) {
+export default function Header({ session, total, connection, onShare, localOnly }) {
   return (
     <header className="header">
       <div className="header__main">
@@ -20,7 +20,8 @@ export default function Header({ session, total, connection, onShare }) {
         </div>
         <div className="header__side">
           {connection && <StatusIndicator connection={connection} />}
-          {onShare && (
+          {localOnly && <span className="pill">This device only</span>}
+          {onShare && !localOnly && (
             <button type="button" className="btn btn--primary" onClick={onShare}>
               Share Session
             </button>

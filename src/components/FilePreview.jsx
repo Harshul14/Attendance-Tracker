@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { GROUPS } from '../utils/excel';
 import { formatDate, todayIso } from '../utils/attendance';
 
-export default function FilePreview({ parsed, creating, error, onStart, onCancel }) {
+export default function FilePreview({ parsed, creating, error, onStart, onStartLocal, onCancel }) {
   const [name, setName] = useState('Morning Session');
   const [date, setDate] = useState(todayIso());
   const total = GROUPS.reduce((sum, g) => sum + parsed.groups[g].length, 0);
@@ -36,6 +36,11 @@ export default function FilePreview({ parsed, creating, error, onStart, onCancel
         <button type="button" className="btn btn--primary btn--xl" disabled={creating || !date} onClick={() => onStart({ name: name.trim() || 'Attendance Session', date })}>
           {creating ? 'Creating session…' : 'Start Attendance'}
         </button>
+        {error && (
+          <button type="button" className="btn" disabled={creating} onClick={() => onStartLocal({ name: name.trim() || 'Attendance Session', date })}>
+            Use this device only (no sharing)
+          </button>
+        )}
         <button type="button" className="btn" disabled={creating} onClick={onCancel}>Choose a different file</button>
       </div>
     </main>

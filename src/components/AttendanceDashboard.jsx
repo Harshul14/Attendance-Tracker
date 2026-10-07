@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLiveSession } from '../hooks/useLiveSession';
 import { NEXT_STATUS, computeStats, filterCandidates } from '../utils/attendance';
 import { exportAttendance } from '../utils/export';
+import { isLocalId } from '../utils/remote';
 import { sessionLink } from '../utils/sessions';
 import CandidateList from './CandidateList';
 import ConfirmDialog from './ConfirmDialog';
@@ -98,7 +99,7 @@ export default function AttendanceDashboard({ sessionId, accessKey, operator, on
 
   return (
     <>
-      <Header session={session} total={stats.total} connection={connection} onShare={() => setDialog('share')} />
+      <Header session={session} total={stats.total} connection={connection} localOnly={isLocalId(sessionId)} onShare={() => setDialog('share')} />
       <div className="sticky">
         <SummaryCards stats={stats} />
       </div>

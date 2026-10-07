@@ -42,13 +42,13 @@ export default function App() {
     setOperator(name);
   };
 
-  const start = async ({ name, date }) => {
+  const start = async ({ name, date }, local = false) => {
     setCreating(true);
     setCreateError('');
     try {
-      open(await createSession({ operator: operator.trim() || getOperator(), name, date, parsed }));
-    } catch {
-      setCreateError('The session could not be created. Check your internet connection and try again.');
+      open(await createSession({ operator: operator.trim() || getOperator(), name, date, parsed, local }));
+    } catch (e) {
+      setCreateError(`The session could not be created: ${e.message || 'unknown error'}.`);
     } finally {
       setCreating(false);
     }
@@ -70,7 +70,7 @@ export default function App() {
     <>
       <Header />
       {parsed ? (
-        <FilePreview parsed={parsed} creating={creating} error={createError} onStart={start} onCancel={() => setParsed(null)} />
+        <FilePreview parsed={parsed} creating={creating} error={createError} onStart={start} onStartLocal={(details) => start(details, true)} onCancel={() => setParsed(null)} />
       ) : (
         <UploadScreen
           recent={getRecentSessions()}
