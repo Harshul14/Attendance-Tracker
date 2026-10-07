@@ -48,7 +48,7 @@ export default function App() {
     try {
       open(await createSession({ operator: operator.trim() || getOperator(), name, date, parsed, local }));
     } catch (e) {
-      setCreateError(`The session could not be created: ${e.message || 'unknown error'}.`);
+      setCreateError(`Could not create a shared session. ${e.message || 'Unknown error'}.`);
     } finally {
       setCreating(false);
     }
